@@ -16,6 +16,7 @@ import {
   onSnapshot,
   serverTimestamp,
   arrayUnion,
+  increment,
 } from '@angular/fire/firestore';
 import { Observable, from } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -186,13 +187,22 @@ export class ChatService {
         readBy: [senderId],
       });
 
-      // Update chat's last message metadata
-      const chatRef = doc(this.firestore, `chats/${chatId}`);
+      // Update last message + increment unread for all other participants
+      const chatRef  = doc(this.firestore, `chats/${chatId}`);
+      const chatSnap = await getDoc(chatRef);
+      const participants: string[] = (chatSnap.data() as Record<string, unknown>)?.['participantIds'] as string[] ?? [];
+
+      const unreadIncrements: Record<string, unknown> = {};
+      for (const pid of participants) {
+        if (pid !== senderId) unreadIncrements[`unreadCount.${pid}`] = increment(1);
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await updateDoc(chatRef, {
         lastMessage: content,
         lastMessageAt: serverTimestamp(),
         lastMessageSenderId: senderId,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ...unreadIncrements,
       } as any);
 
       return;
