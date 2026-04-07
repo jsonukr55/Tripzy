@@ -152,9 +152,17 @@ import { JoinRequestDialogComponent, JoinDialogData } from '../../components/joi
                 </button>
               }
             } @else {
-              <a class="edit-btn" [routerLink]="['/trips', trip()!.id, 'edit']">
-                <mat-icon>edit</mat-icon> Edit Trip
-              </a>
+              <div class="host-actions">
+                <a class="requests-btn" [routerLink]="['/trips', trip()!.id, 'requests']">
+                  <mat-icon>people</mat-icon> View Requests
+                  @if (pendingCount() > 0) {
+                    <span class="pending-badge">{{ pendingCount() }}</span>
+                  }
+                </a>
+                <a class="edit-btn" [routerLink]="['/trips', trip()!.id, 'edit']">
+                  <mat-icon>edit</mat-icon> Edit Trip
+                </a>
+              </div>
             }
           </div>
 
@@ -267,6 +275,21 @@ import { JoinRequestDialogComponent, JoinDialogData } from '../../components/joi
       &:hover { opacity:.92; transform:translateY(-1px); }
     }
     .join-btn--disabled { background:#e2e8f0; color:#94a3b8; box-shadow:none; cursor:not-allowed; }
+    .host-actions { display:flex; flex-direction:column; gap:10px; }
+    .requests-btn {
+      position:relative; width:100%; height:50px;
+      display:flex; align-items:center; justify-content:center; gap:8px;
+      background:linear-gradient(135deg,#ff6b2b,#ff9f1c); border-radius:12px;
+      font-size:15px; font-weight:700; color:#fff; text-decoration:none;
+      box-shadow:0 4px 12px rgba(255,107,43,.3);
+      mat-icon { font-size:20px; }
+      &:hover { opacity:.92; }
+    }
+    .pending-badge {
+      position:absolute; top:-6px; right:-6px;
+      background:#dc2626; color:#fff; border-radius:10px;
+      padding:2px 7px; font-size:11px; font-weight:700;
+    }
     .edit-btn {
       width:100%; height:50px;
       display:flex; align-items:center; justify-content:center; gap:8px;
@@ -302,6 +325,7 @@ export class TripDetailComponent implements OnInit {
   readonly loading      = signal(true);
   readonly trip         = signal<Trip | null>(null);
   readonly hasRequested = signal(false);
+  readonly pendingCount = signal(0);
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id')!;
@@ -312,6 +336,11 @@ export class TripDetailComponent implements OnInit {
         const uid = this.auth.uid;
         if (uid && t) {
           this.requestService.hasRequested(t.id, uid).subscribe((result) => this.hasRequested.set(result));
+          if (t.hostId === uid) {
+            this.requestService.getRequestsForTrip(t.id).subscribe((reqs) =>
+              this.pendingCount.set(reqs.filter(r => r.status === 'pending').length)
+            );
+          }
         }
       },
       error: () => this.loading.set(false),
