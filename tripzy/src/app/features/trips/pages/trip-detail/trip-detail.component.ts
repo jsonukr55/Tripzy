@@ -104,6 +104,8 @@ import { SetCostDialogComponent, SetCostDialogData } from '../../components/set-
                 [currency]="trip()!.currency"
                 [isHost]="isHost()"
                 [myUid]="auth.uid ?? ''"
+                [myName]="auth.currentUser()?.displayName ?? ''"
+                [myPhotoURL]="auth.currentUser()?.photoURL ?? null"
               />
             }
 

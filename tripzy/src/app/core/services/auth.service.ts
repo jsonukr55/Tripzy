@@ -1,4 +1,4 @@
-import { Injectable, inject, signal, Injector, runInInjectionContext } from '@angular/core';
+import { Injectable, inject, signal, Injector, NgZone, runInInjectionContext } from '@angular/core';
 import {
   Auth,
   createUserWithEmailAndPassword,
@@ -21,6 +21,7 @@ export class AuthService {
   private router      = inject(Router);
   private userService = inject(UserService);
   private injector    = inject(Injector);
+  private ngZone      = inject(NgZone);
 
   readonly currentUser = signal<User | null>(null);
   readonly isLoading = signal(true);
@@ -28,8 +29,11 @@ export class AuthService {
   constructor() {
     runInInjectionContext(this.injector, () => {
       onAuthStateChanged(this.auth, (user) => {
-        this.currentUser.set(user);
-        this.isLoading.set(false);
+        // Firebase callbacks run outside Angular's zone — run inside to trigger change detection
+        this.ngZone.run(() => {
+          this.currentUser.set(user);
+          this.isLoading.set(false);
+        });
       });
     });
   }

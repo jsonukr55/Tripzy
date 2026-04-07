@@ -121,6 +121,8 @@ export class PaymentSummaryComponent implements OnInit {
   @Input() currency!: string;
   @Input() isHost!: boolean;
   @Input() myUid!: string;
+  @Input() myName: string = '';
+  @Input() myPhotoURL: string | null = null;
 
   private paymentSvc = inject(PaymentService);
   private snackBar   = inject(MatSnackBar);
@@ -139,8 +141,30 @@ export class PaymentSummaryComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    this.loadPayments();
+  }
+
+  private loadPayments(): void {
     this.paymentSvc.getPaymentsForTrip(this.tripId).subscribe({
-      next: (list) => { this.payments.set(list); this.loading.set(false); },
+      next: (list) => {
+        this.payments.set(list);
+        this.loading.set(false);
+        // Auto-create record for current participant if their record is missing
+        if (!this.isHost && this.myUid && !list.some(p => p.userId === this.myUid)) {
+          this.paymentSvc.createPaymentRecord(
+            this.tripId,
+            { uid: this.myUid, displayName: this.myName || 'Participant', photoURL: this.myPhotoURL },
+            this.costPerPerson,
+            this.currency,
+          ).subscribe({
+            next: () => this.paymentSvc.getPaymentsForTrip(this.tripId).subscribe({
+              next: (updated) => this.payments.set(updated),
+              error: () => {},
+            }),
+            error: () => {},
+          });
+        }
+      },
       error: () => this.loading.set(false),
     });
   }

@@ -8,7 +8,6 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { RequestService } from '../../../../core/services/request.service';
 import { AuthService } from '../../../../core/services/auth.service';
-import { UserService } from '../../../../core/services/user.service';
 import { Trip } from '../../../../core/models/trip.model';
 
 export interface JoinDialogData { trip: Trip; }
@@ -68,7 +67,6 @@ export class JoinRequestDialogComponent {
   private fb             = inject(FormBuilder);
   private requestService = inject(RequestService);
   private auth           = inject(AuthService);
-  private userService    = inject(UserService);
   private dialogRef      = inject(MatDialogRef<JoinRequestDialogComponent>);
   readonly data: JoinDialogData = inject(MAT_DIALOG_DATA);
 
@@ -82,23 +80,22 @@ export class JoinRequestDialogComponent {
 
   submit(): void {
     if (this.form.invalid) { this.form.markAllAsTouched(); return; }
-    const uid = this.auth.uid!;
+    const user = this.auth.currentUser();
+    if (!user) return;
     this.submitting.set(true);
-    this.userService.getProfile(uid).subscribe((profile) => {
-      const trip = this.data.trip;
-      this.requestService.sendRequest({
-        tripId:            trip.id,
-        tripTitle:         trip.title,
-        tripCoverImageURL: trip.coverImageURL ?? undefined,
-        requesterId:       uid,
-        requesterName:     profile?.displayName ?? this.auth.currentUser()?.displayName ?? 'Traveller',
-        requesterPhotoURL: profile?.photoURL ?? this.auth.currentUser()?.photoURL ?? undefined,
-        hostId:            trip.hostId,
-        message:           this.form.value.message!,
-      }).subscribe({
-        next: () => { this.submitting.set(false); this.dialogRef.close('sent'); },
-        error: () => this.submitting.set(false),
-      });
+    const trip = this.data.trip;
+    this.requestService.sendRequest({
+      tripId:            trip.id,
+      tripTitle:         trip.title,
+      tripCoverImageURL: trip.coverImageURL ?? undefined,
+      requesterId:       user.uid,
+      requesterName:     user.displayName ?? 'Traveller',
+      requesterPhotoURL: user.photoURL ?? undefined,
+      hostId:            trip.hostId,
+      message:           this.form.value.message!,
+    }).subscribe({
+      next: () => { this.submitting.set(false); this.dialogRef.close('sent'); },
+      error: () => this.submitting.set(false),
     });
   }
 }
