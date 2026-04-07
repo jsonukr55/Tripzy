@@ -7,7 +7,9 @@ import { MatChipsModule } from '@angular/material/chips';
 
 import { AuthService } from '../../../../core/services/auth.service';
 import { UserService } from '../../../../core/services/user.service';
+import { ReviewService } from '../../../../core/services/review.service';
 import { UserProfile, TravelPreference } from '../../../../core/models/user.model';
+import { Review } from '../../../../core/models/review.model';
 import { LoadingSpinnerComponent } from '../../../../shared/components/loading-spinner/loading-spinner.component';
 
 const PREF_META: Record<TravelPreference, { icon: string; label: string; color: string }> = {
@@ -153,6 +155,44 @@ const PREF_META: Record<TravelPreference, { icon: string; label: string; color: 
           </div>
 
         </div>
+
+        <!-- Reviews -->
+        @if (reviews().length > 0) {
+          <div class="reviews-section">
+            <h2 class="section-title">
+              <mat-icon>star</mat-icon>
+              Reviews <span class="review-count">({{ reviews().length }})</span>
+            </h2>
+            <div class="reviews-list">
+              @for (review of reviews(); track review.id) {
+                <div class="review-card">
+                  <div class="review-header">
+                    <div class="reviewer-avatar">
+                      @if (review.reviewerPhotoURL) {
+                        <img [src]="review.reviewerPhotoURL" [alt]="review.reviewerName" />
+                      } @else {
+                        <span>{{ review.reviewerName[0].toUpperCase() }}</span>
+                      }
+                    </div>
+                    <div class="reviewer-info">
+                      <span class="reviewer-name">{{ review.reviewerName }}</span>
+                      <span class="review-date">{{ review.createdAt | date:'d MMM yyyy' }}</span>
+                    </div>
+                    <div class="review-stars">
+                      @for (s of [1,2,3,4,5]; track s) {
+                        <mat-icon class="star-icon" [class.filled]="s <= review.rating">
+                          {{ s <= review.rating ? 'star' : 'star_border' }}
+                        </mat-icon>
+                      }
+                    </div>
+                  </div>
+                  <p class="review-comment">{{ review.comment }}</p>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
       </div>
     }
   `,
@@ -289,6 +329,23 @@ const PREF_META: Record<TravelPreference, { icon: string; label: string; color: 
 
     .empty-hint { font-size: 13px; color: #94a3b8; margin: 0; a { color: #ff6b2b; } }
 
+    /* Reviews */
+    .reviews-section { margin-top:8px; }
+    .section-title { display:flex; align-items:center; gap:8px; font-size:18px; font-weight:800; color:#0a0f28; margin:0 0 16px; mat-icon { color:#ff9f1c; font-size:22px; } }
+    .review-count { font-size:14px; color:#64748b; font-weight:500; }
+    .reviews-list { display:flex; flex-direction:column; gap:12px; }
+    .review-card { background:#fff; border-radius:14px; border:1px solid #e2e8f0; padding:18px; }
+    .review-header { display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+    .reviewer-avatar { width:40px; height:40px; border-radius:50%; overflow:hidden; flex-shrink:0; background:linear-gradient(135deg,#ff6b2b,#ff9f1c); display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:700; color:#fff; }
+    .reviewer-avatar img { width:100%; height:100%; object-fit:cover; }
+    .reviewer-info { flex:1; }
+    .reviewer-name { display:block; font-size:14px; font-weight:700; color:#0a0f28; }
+    .review-date { display:block; font-size:12px; color:#94a3b8; }
+    .review-stars { display:flex; gap:2px; }
+    .star-icon { font-size:18px; width:18px; height:18px; color:#e2e8f0; }
+    .star-icon.filled { color:#ff9f1c; }
+    .review-comment { font-size:14px; color:#475569; margin:0; line-height:1.6; }
+
     @media (max-width: 640px) {
       .body-grid { grid-template-columns: 1fr; }
       .stats-card { padding: 16px 20px !important; }
@@ -299,9 +356,11 @@ const PREF_META: Record<TravelPreference, { icon: string; label: string; color: 
 export class ProfileComponent implements OnInit {
   private auth        = inject(AuthService);
   private userService = inject(UserService);
+  private reviewSvc   = inject(ReviewService);
 
   readonly loading = signal(true);
   readonly profile = signal<UserProfile | null>(null);
+  readonly reviews = signal<Review[]>([]);
 
   prefMeta = (pref: TravelPreference) => PREF_META[pref];
 
@@ -313,5 +372,7 @@ export class ProfileComponent implements OnInit {
       next: (p) => { this.profile.set(p); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
+
+    this.reviewSvc.getReviewsForUser(uid).subscribe(r => this.reviews.set(r));
   }
 }

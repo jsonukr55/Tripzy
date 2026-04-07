@@ -9,15 +9,17 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { TripService } from '../../../../core/services/trip.service';
 import { AuthService } from '../../../../core/services/auth.service';
 import { RequestService } from '../../../../core/services/request.service';
+import { ReviewService } from '../../../../core/services/review.service';
 import { Trip } from '../../../../core/models/trip.model';
 import { LoadingSpinnerComponent } from '../../../../shared/components/loading-spinner/loading-spinner.component';
 import { EmptyStateComponent } from '../../../../shared/components/empty-state/empty-state.component';
 import { JoinRequestDialogComponent, JoinDialogData } from '../../components/join-request-dialog/join-request-dialog.component';
+import { ReviewDialogComponent, ReviewDialogData } from '../../components/review-dialog/review-dialog.component';
 
 @Component({
   selector: 'app-trip-detail',
   standalone: true,
-  imports: [RouterLink, DatePipe, DecimalPipe, MatIconModule, MatButtonModule, MatSnackBarModule, MatDialogModule, LoadingSpinnerComponent, EmptyStateComponent],
+  imports: [RouterLink, DatePipe, DecimalPipe, MatIconModule, MatButtonModule, MatSnackBarModule, MatDialogModule, LoadingSpinnerComponent, EmptyStateComponent, ReviewDialogComponent],
   template: `
     @if (loading()) {
       <app-loading-spinner message="Loading trip..." />
@@ -164,6 +166,38 @@ import { JoinRequestDialogComponent, JoinDialogData } from '../../components/joi
                 </a>
               </div>
             }
+
+            <!-- Rate members -->
+            @if (canReview()) {
+              <div class="review-section">
+                <h3 class="review-title"><mat-icon>star</mat-icon> Rate Members</h3>
+                <div class="review-list">
+                  @for (person of reviewTargets(); track person.id) {
+                    <div class="review-row">
+                      <div class="review-avatar">
+                        @if (person.photoURL) {
+                          <img [src]="person.photoURL" [alt]="person.name" />
+                        } @else {
+                          <span>{{ person.name[0].toUpperCase() }}</span>
+                        }
+                      </div>
+                      <div class="review-info">
+                        <span class="review-name">{{ person.name }}</span>
+                        <span class="review-role">{{ person.role }}</span>
+                      </div>
+                      @if (reviewedIds().has(person.id)) {
+                        <span class="reviewed-chip"><mat-icon>check_circle</mat-icon> Reviewed</span>
+                      } @else {
+                        <button class="rate-btn" (click)="openReview(person.id, person.name, person.photoURL, person.type)">
+                          <mat-icon>star_border</mat-icon> Rate
+                        </button>
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+
           </div>
 
         </div>
@@ -302,6 +336,19 @@ import { JoinRequestDialogComponent, JoinDialogData } from '../../components/joi
 
     .side-col { display:flex; flex-direction:column; gap:16px; position:sticky; top:20px; }
 
+    /* Review section */
+    .review-section { background:#fff; border-radius:14px; border:1px solid #e2e8f0; padding:18px; }
+    .review-title { display:flex; align-items:center; gap:6px; margin:0 0 14px; font-size:15px; font-weight:700; color:#0a0f28; mat-icon { font-size:18px; color:#ff9f1c; } }
+    .review-list { display:flex; flex-direction:column; gap:10px; }
+    .review-row { display:flex; align-items:center; gap:10px; }
+    .review-avatar { width:36px; height:36px; border-radius:50%; overflow:hidden; flex-shrink:0; background:linear-gradient(135deg,#ff6b2b,#ff9f1c); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:#fff; }
+    .review-avatar img { width:100%; height:100%; object-fit:cover; }
+    .review-info { flex:1; min-width:0; }
+    .review-name { display:block; font-size:13px; font-weight:600; color:#0a0f28; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .review-role { display:block; font-size:11px; color:#94a3b8; }
+    .rate-btn { display:flex; align-items:center; gap:4px; padding:5px 12px; background:linear-gradient(135deg,#ff6b2b,#ff9f1c); color:#fff; border:none; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; mat-icon { font-size:14px; width:14px; height:14px; } }
+    .reviewed-chip { display:flex; align-items:center; gap:4px; padding:5px 10px; background:#f0fdf4; color:#16a34a; border-radius:8px; font-size:12px; font-weight:600; white-space:nowrap; mat-icon { font-size:14px; width:14px; height:14px; } }
+
     @media (max-width:900px) {
       .detail-layout { grid-template-columns:1fr; }
       .side-col { position:static; }
@@ -321,11 +368,15 @@ export class TripDetailComponent implements OnInit {
   private snackBar       = inject(MatSnackBar);
   private dialog         = inject(MatDialog);
   private requestService = inject(RequestService);
+  private reviewService  = inject(ReviewService);
 
   readonly loading      = signal(true);
   readonly trip         = signal<Trip | null>(null);
   readonly hasRequested = signal(false);
   readonly pendingCount = signal(0);
+  readonly reviewedIds  = signal<Set<string>>(new Set());
+  readonly canReview    = signal(false);
+  readonly reviewTargets = signal<Array<{id: string; name: string; photoURL: string | null; role: string; type: 'host' | 'participant'}>>([]);
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id')!;
@@ -340,6 +391,40 @@ export class TripDetailComponent implements OnInit {
             this.requestService.getRequestsForTrip(t.id).subscribe((reqs) =>
               this.pendingCount.set(reqs.filter(r => r.status === 'pending').length)
             );
+          }
+
+          // Load already-reviewed IDs for this trip
+          const peopleToCheck = t.hostId === uid
+            ? t.participantIds.filter(id => id !== uid)
+            : [t.hostId];
+          peopleToCheck.forEach(targetId => {
+            this.reviewService.hasReviewed(uid, targetId, t.id).subscribe(has => {
+              if (has) this.reviewedIds.update(s => new Set([...s, targetId]));
+            });
+          });
+
+          // Set up review targets
+          const isHost = t.hostId === uid;
+          const isParticipant = t.participantIds.includes(uid);
+          if (isHost || isParticipant) {
+            this.canReview.set(true);
+            if (isHost) {
+              // Host rates each participant (excluding self)
+              this.reviewTargets.set(
+                t.participantIds
+                  .filter(pid => pid !== uid)
+                  .map(pid => ({ id: pid, name: 'Participant', photoURL: null, role: 'Participant', type: 'participant' as const }))
+              );
+            } else {
+              // Participant rates the host
+              this.reviewTargets.set([{
+                id: t.hostId,
+                name: t.hostName,
+                photoURL: t.hostPhotoURL,
+                role: 'Trip Host',
+                type: 'host' as const,
+              }]);
+            }
           }
         }
       },
@@ -379,6 +464,20 @@ export class TripDetailComponent implements OnInit {
       if (result === 'sent') {
         this.hasRequested.set(true);
         this.snackBar.open('Join request sent!', undefined, { duration: 3000 });
+      }
+    });
+  }
+
+  openReview(targetId: string, targetName: string, targetPhotoURL: string | null, targetType: 'host' | 'participant'): void {
+    const trip = this.trip();
+    if (!trip) return;
+    const ref = this.dialog.open(ReviewDialogComponent, {
+      data: { tripId: trip.id, targetId, targetName, targetPhotoURL, targetType } as ReviewDialogData,
+      width: '480px', maxWidth: '95vw',
+    });
+    ref.afterClosed().subscribe(result => {
+      if (result === 'submitted') {
+        this.reviewedIds.update(s => new Set([...s, targetId]));
       }
     });
   }
