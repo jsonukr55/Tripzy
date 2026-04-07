@@ -12,6 +12,7 @@ import { RequestService } from '../../../../core/services/request.service';
 import { ReviewService } from '../../../../core/services/review.service';
 import { PaymentService } from '../../../../core/services/payment.service';
 import { Trip } from '../../../../core/models/trip.model';
+import { JoinRequest } from '../../../../core/models/request.model';
 import { LoadingSpinnerComponent } from '../../../../shared/components/loading-spinner/loading-spinner.component';
 import { EmptyStateComponent } from '../../../../shared/components/empty-state/empty-state.component';
 import { JoinRequestDialogComponent, JoinDialogData } from '../../components/join-request-dialog/join-request-dialog.component';
@@ -156,10 +157,34 @@ import { SetCostDialogComponent, SetCostDialogData } from '../../components/set-
 
             <!-- CTA -->
             @if (!isHost()) {
-              @if (trip()!.status === 'open') {
-                <button class="join-btn" (click)="requestJoin()" [disabled]="hasRequested()" [class.join-btn--disabled]="hasRequested()">
-                  <mat-icon>{{ hasRequested() ? 'check_circle' : 'group_add' }}</mat-icon>
-                  {{ hasRequested() ? 'Request Sent' : 'Request to Join' }}
+              @if (myRequest()?.status === 'approved') {
+                <div class="approved-banner">
+                  <mat-icon>check_circle</mat-icon>
+                  <div>
+                    <strong>You're in!</strong>
+                    <span>Your join request was approved</span>
+                  </div>
+                </div>
+                @if (trip()!.paymentEnabled && trip()!.costPerPerson) {
+                  <div class="pay-notice">
+                    <mat-icon>payments</mat-icon>
+                    <span>Payment of {{ trip()!.currency }} {{ trip()!.costPerPerson | number }} is due. See the payment tracker above.</span>
+                  </div>
+                }
+              } @else if (myRequest()?.status === 'rejected') {
+                <button class="join-btn join-btn--disabled" disabled>
+                  <mat-icon>cancel</mat-icon>
+                  Request Rejected
+                </button>
+              } @else if (myRequest()?.status === 'pending') {
+                <button class="join-btn join-btn--disabled" disabled>
+                  <mat-icon>hourglass_empty</mat-icon>
+                  Request Sent — Pending
+                </button>
+              } @else if (trip()!.status === 'open') {
+                <button class="join-btn" (click)="requestJoin()">
+                  <mat-icon>group_add</mat-icon>
+                  Request to Join
                 </button>
               } @else {
                 <button class="join-btn join-btn--disabled" disabled>
@@ -327,6 +352,19 @@ import { SetCostDialogComponent, SetCostDialogData } from '../../components/set-
       &:hover { opacity:.92; transform:translateY(-1px); }
     }
     .join-btn--disabled { background:#e2e8f0; color:#94a3b8; box-shadow:none; cursor:not-allowed; }
+    .approved-banner {
+      display:flex; align-items:center; gap:12px; padding:14px 16px;
+      background:linear-gradient(135deg,#f0fdf4,#dcfce7); border:1.5px solid #86efac; border-radius:12px;
+      mat-icon { color:#16a34a; font-size:24px; flex-shrink:0; }
+      div { display:flex; flex-direction:column; gap:2px; }
+      strong { font-size:14px; font-weight:700; color:#15803d; }
+      span { font-size:12px; color:#166534; }
+    }
+    .pay-notice {
+      display:flex; align-items:flex-start; gap:8px; padding:12px 14px;
+      background:#fff7ed; border:1.5px solid #fed7aa; border-radius:10px; font-size:12.5px; color:#9a3412;
+      mat-icon { font-size:16px; width:16px; height:16px; flex-shrink:0; margin-top:1px; color:#ea580c; }
+    }
     .host-actions { display:flex; flex-direction:column; gap:10px; }
     .requests-btn {
       position:relative; width:100%; height:50px;
@@ -400,7 +438,7 @@ export class TripDetailComponent implements OnInit {
 
   readonly loading      = signal(true);
   readonly trip         = signal<Trip | null>(null);
-  readonly hasRequested = signal(false);
+  readonly myRequest    = signal<JoinRequest | null>(null);
   readonly pendingCount = signal(0);
   readonly reviewedIds  = signal<Set<string>>(new Set());
   readonly canReview    = signal(false);
@@ -414,7 +452,7 @@ export class TripDetailComponent implements OnInit {
         this.loading.set(false);
         const uid = this.auth.uid;
         if (uid && t) {
-          this.requestService.hasRequested(t.id, uid).subscribe((result) => this.hasRequested.set(result));
+          this.requestService.getMyRequestForTrip(t.id, uid).subscribe((req) => this.myRequest.set(req));
           if (t.hostId === uid) {
             this.requestService.getRequestsForTrip(t.id).subscribe((reqs) =>
               this.pendingCount.set(reqs.filter(r => r.status === 'pending').length)
@@ -490,7 +528,9 @@ export class TripDetailComponent implements OnInit {
     );
     ref.afterClosed().subscribe((result) => {
       if (result === 'sent') {
-        this.hasRequested.set(true);
+        // Re-fetch the actual request so status reflects correctly
+        const uid = this.auth.uid;
+        if (uid) this.requestService.getMyRequestForTrip(trip.id, uid).subscribe(req => this.myRequest.set(req));
         this.snackBar.open('Join request sent!', undefined, { duration: 3000 });
       }
     });

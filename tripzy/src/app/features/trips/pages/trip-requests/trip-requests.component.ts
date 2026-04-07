@@ -215,8 +215,10 @@ export class TripRequestsComponent implements OnInit {
         this.requests.update(list => list.map(r => r.id === req.id ? { ...r, status } : r));
         this.processingId.set(null);
         this.snackBar.open(status === 'approved' ? 'Request approved!' : 'Request rejected.', undefined, { duration: 2500 });
-        // Auto-create payment record when approving, if trip has payment tracking enabled
         if (status === 'approved') {
+          // Add user to trip's participantIds atomically
+          this.tripService.addParticipant(this.tripId, req.requesterId).subscribe();
+          // Auto-create payment record if trip has payment tracking enabled
           const t = this.trip();
           if (t?.paymentEnabled && t.costPerPerson) {
             this.paymentService.createPaymentRecord(

@@ -14,6 +14,8 @@ import {
   where,
   orderBy,
   limit,
+  arrayUnion,
+  increment,
 } from '@angular/fire/firestore';
 import { Observable, from } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -131,6 +133,13 @@ export class TripService {
     if (data.endDate)   payload['endDate']   = Timestamp.fromDate(data.endDate);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return this.run(() => updateDoc(ref, payload as any));
+  }
+
+  /** Add an approved participant atomically */
+  addParticipant(tripId: string, userId: string): Observable<void> {
+    const ref = doc(this.firestore, `trips/${tripId}`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return this.run(() => updateDoc(ref, { participantIds: arrayUnion(userId), currentParticipants: increment(1), updatedAt: serverTimestamp() } as any));
   }
 
   /** Delete a trip */

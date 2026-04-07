@@ -66,6 +66,14 @@ export class RequestService {
     return this.run(() => getDocs(q)).pipe(map((snap) => !snap.empty));
   }
 
+  /** Get the actual request object for the current user on a trip (null if none) */
+  getMyRequestForTrip(tripId: string, uid: string): Observable<JoinRequest | null> {
+    const q = query(this.col(), where('tripId', '==', tripId), where('requesterId', '==', uid));
+    return this.run(() => getDocs(q)).pipe(
+      map((snap) => snap.empty ? null : normalize(snap.docs[0].data() as Record<string, unknown>, snap.docs[0].id))
+    );
+  }
+
   /** Approve or reject a request */
   updateStatus(requestId: string, status: RequestStatus): Observable<void> {
     const ref = doc(this.firestore, `joinRequests/${requestId}`);
