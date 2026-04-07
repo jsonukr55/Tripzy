@@ -125,15 +125,14 @@ export class ChatService {
       const q = query(
         this.chatsCol(),
         where('participantIds', 'array-contains', uid),
-        orderBy('lastMessageAt', 'desc'),
         limit(50),
       );
       const unsub = runInInjectionContext(this.injector, () =>
         onSnapshot(q, (snap) => {
           this.zone.run(() => {
-            const chats = snap.docs.map((d) =>
-              normalizeChat(d.data() as Record<string, unknown>, d.id)
-            );
+            const chats = snap.docs
+              .map((d) => normalizeChat(d.data() as Record<string, unknown>, d.id))
+              .sort((a, b) => b.lastMessageAt.getTime() - a.lastMessageAt.getTime());
             observer.next(chats);
           });
         }, (err) => observer.error(err))

@@ -277,9 +277,12 @@ export class LayoutComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     const uid = this.auth.uid;
     if (!uid) return;
-    this.chatSub = this.chatService.getMyChats(uid).subscribe((chats) => {
-      const total = chats.reduce((sum, c) => sum + (c.unreadCount?.[uid] ?? 0), 0);
-      this.totalUnread.set(total);
+    this.chatSub = this.chatService.getMyChats(uid).subscribe({
+      next: (chats) => {
+        const total = chats.reduce((sum, c) => sum + (c.unreadCount?.[uid] ?? 0), 0);
+        this.totalUnread.set(total);
+      },
+      error: (err) => console.warn('[Layout] chat subscription error:', err),
     });
   }
 
