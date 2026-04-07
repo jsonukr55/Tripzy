@@ -554,8 +554,22 @@ export class TripDetailComponent implements OnInit {
     ref.afterClosed().subscribe(result => {
       if (result === 'saved') {
         this.snackBar.open('Payment settings saved!', undefined, { duration: 2500 });
-        // Re-fetch trip to reflect updated paymentEnabled / costPerPerson
-        this.tripSvc.getTripDoc(trip.id).subscribe(t => this.trip.set(t));
+        // Re-fetch trip, then backfill payment records for already-approved participants
+        this.tripSvc.getTripDoc(trip.id).subscribe(t => {
+          this.trip.set(t);
+          if (t?.paymentEnabled && t.costPerPerson) {
+            this.requestService.getRequestsForTrip(trip.id).subscribe(reqs => {
+              reqs.filter(r => r.status === 'approved').forEach(req => {
+                this.paymentSvc.createPaymentRecord(
+                  trip.id,
+                  { uid: req.requesterId, displayName: req.requesterName, photoURL: req.requesterPhotoURL ?? null },
+                  t.costPerPerson!,
+                  t.currency,
+                ).subscribe();
+              });
+            });
+          }
+        });
       }
     });
   }

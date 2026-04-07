@@ -6,7 +6,7 @@ import {
 import { provideRouter, withViewTransitions } from '@angular/router';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { initializeApp, provideFirebaseApp } from '@angular/fire/app';
-import { getAuth, provideAuth } from '@angular/fire/auth';
+import { getAuth, provideAuth, browserLocalPersistence, setPersistence } from '@angular/fire/auth';
 import { getFirestore, provideFirestore } from '@angular/fire/firestore';
 import { getStorage, provideStorage } from '@angular/fire/storage';
 
@@ -22,7 +22,11 @@ export const appConfig: ApplicationConfig = {
 
     // Firebase
     provideFirebaseApp(() => initializeApp(environment.firebase)),
-    provideAuth(() => getAuth()),
+    provideAuth(() => {
+      const auth = getAuth();
+      setPersistence(auth, browserLocalPersistence);
+      return auth;
+    }),
     provideFirestore(() => getFirestore()),
     provideStorage(() => getStorage()),
   ],
