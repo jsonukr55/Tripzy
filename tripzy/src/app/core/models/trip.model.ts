@@ -43,4 +43,8 @@ export interface Trip {
   status: TripStatus;
   createdAt: Date;
   updatedAt: Date;
+
+  // Payment tracking (optional)
+  paymentEnabled?: boolean;
+  costPerPerson?: number;
 }

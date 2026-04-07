@@ -8,6 +8,7 @@ import { RequestService } from '../../../../core/services/request.service';
 import { AuthService } from '../../../../core/services/auth.service';
 import { TripService } from '../../../../core/services/trip.service';
 import { ChatService } from '../../../../core/services/chat.service';
+import { PaymentService } from '../../../../core/services/payment.service';
 import { JoinRequest, RequestStatus } from '../../../../core/models/request.model';
 import { Trip } from '../../../../core/models/trip.model';
 import { LoadingSpinnerComponent } from '../../../../shared/components/loading-spinner/loading-spinner.component';
@@ -142,6 +143,7 @@ export class TripRequestsComponent implements OnInit {
   private tripService    = inject(TripService);
   private auth           = inject(AuthService);
   private chatService    = inject(ChatService);
+  private paymentService = inject(PaymentService);
   private snackBar       = inject(MatSnackBar);
 
   readonly loading      = signal(true);
@@ -213,6 +215,18 @@ export class TripRequestsComponent implements OnInit {
         this.requests.update(list => list.map(r => r.id === req.id ? { ...r, status } : r));
         this.processingId.set(null);
         this.snackBar.open(status === 'approved' ? 'Request approved!' : 'Request rejected.', undefined, { duration: 2500 });
+        // Auto-create payment record when approving, if trip has payment tracking enabled
+        if (status === 'approved') {
+          const t = this.trip();
+          if (t?.paymentEnabled && t.costPerPerson) {
+            this.paymentService.createPaymentRecord(
+              this.tripId,
+              { uid: req.requesterId, displayName: req.requesterName, photoURL: req.requesterPhotoURL ?? null },
+              t.costPerPerson,
+              t.currency,
+            ).subscribe();
+          }
+        }
       },
       error: () => {
         this.processingId.set(null);

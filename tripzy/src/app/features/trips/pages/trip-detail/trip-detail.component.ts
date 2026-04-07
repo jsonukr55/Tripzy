@@ -10,16 +10,19 @@ import { TripService } from '../../../../core/services/trip.service';
 import { AuthService } from '../../../../core/services/auth.service';
 import { RequestService } from '../../../../core/services/request.service';
 import { ReviewService } from '../../../../core/services/review.service';
+import { PaymentService } from '../../../../core/services/payment.service';
 import { Trip } from '../../../../core/models/trip.model';
 import { LoadingSpinnerComponent } from '../../../../shared/components/loading-spinner/loading-spinner.component';
 import { EmptyStateComponent } from '../../../../shared/components/empty-state/empty-state.component';
 import { JoinRequestDialogComponent, JoinDialogData } from '../../components/join-request-dialog/join-request-dialog.component';
 import { ReviewDialogComponent, ReviewDialogData } from '../../components/review-dialog/review-dialog.component';
+import { PaymentSummaryComponent } from '../../components/payment-summary/payment-summary.component';
+import { SetCostDialogComponent, SetCostDialogData } from '../../components/set-cost-dialog/set-cost-dialog.component';
 
 @Component({
   selector: 'app-trip-detail',
   standalone: true,
-  imports: [RouterLink, DatePipe, DecimalPipe, MatIconModule, MatButtonModule, MatSnackBarModule, MatDialogModule, LoadingSpinnerComponent, EmptyStateComponent, ReviewDialogComponent],
+  imports: [RouterLink, DatePipe, DecimalPipe, MatIconModule, MatButtonModule, MatSnackBarModule, MatDialogModule, LoadingSpinnerComponent, EmptyStateComponent, PaymentSummaryComponent],
   template: `
     @if (loading()) {
       <app-loading-spinner message="Loading trip..." />
@@ -91,6 +94,17 @@ import { ReviewDialogComponent, ReviewDialogData } from '../../components/review
               <div class="card-header"><mat-icon>description</mat-icon><h3>About this trip</h3></div>
               <p class="desc-text">{{ trip()!.description }}</p>
             </div>
+
+            <!-- Payment summary -->
+            @if (trip()!.paymentEnabled && trip()!.costPerPerson) {
+              <app-payment-summary
+                [tripId]="trip()!.id"
+                [costPerPerson]="trip()!.costPerPerson!"
+                [currency]="trip()!.currency"
+                [isHost]="isHost()"
+                [myUid]="auth.uid ?? ''"
+              />
+            }
 
             <!-- Spots remaining -->
             <div class="spots-bar">
@@ -164,6 +178,10 @@ import { ReviewDialogComponent, ReviewDialogData } from '../../components/review
                 <a class="edit-btn" [routerLink]="['/trips', trip()!.id, 'edit']">
                   <mat-icon>edit</mat-icon> Edit Trip
                 </a>
+                <button class="cost-btn" (click)="openSetCost()">
+                  <mat-icon>payments</mat-icon>
+                  {{ trip()!.paymentEnabled ? 'Payment Settings' : 'Set Trip Cost' }}
+                </button>
               </div>
             }
 
@@ -333,6 +351,15 @@ import { ReviewDialogComponent, ReviewDialogData } from '../../components/review
       mat-icon { font-size:20px; }
       &:hover { border-color:#ff9f1c; background:#fffaf5; }
     }
+    .cost-btn {
+      width:100%; height:44px;
+      display:flex; align-items:center; justify-content:center; gap:8px;
+      background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:12px;
+      font-size:13.5px; font-weight:700; color:#475569; cursor:pointer;
+      transition:border-color .15s, background .15s;
+      mat-icon { font-size:18px; }
+      &:hover { border-color:#ff9f1c; color:#ff6b2b; background:#fffaf5; }
+    }
 
     .side-col { display:flex; flex-direction:column; gap:16px; position:sticky; top:20px; }
 
@@ -364,11 +391,12 @@ import { ReviewDialogComponent, ReviewDialogData } from '../../components/review
 export class TripDetailComponent implements OnInit {
   private route          = inject(ActivatedRoute);
   private tripSvc        = inject(TripService);
-  private auth           = inject(AuthService);
+  readonly auth          = inject(AuthService);
   private snackBar       = inject(MatSnackBar);
   private dialog         = inject(MatDialog);
   private requestService = inject(RequestService);
   private reviewService  = inject(ReviewService);
+  private paymentSvc     = inject(PaymentService);
 
   readonly loading      = signal(true);
   readonly trip         = signal<Trip | null>(null);
@@ -464,6 +492,30 @@ export class TripDetailComponent implements OnInit {
       if (result === 'sent') {
         this.hasRequested.set(true);
         this.snackBar.open('Join request sent!', undefined, { duration: 3000 });
+      }
+    });
+  }
+
+  openSetCost(): void {
+    const trip = this.trip();
+    if (!trip) return;
+    const ref = this.dialog.open<SetCostDialogComponent, SetCostDialogData, string>(
+      SetCostDialogComponent,
+      {
+        data: {
+          tripId: trip.id,
+          currentCost: trip.costPerPerson ?? null,
+          currency: trip.currency,
+          paymentEnabled: trip.paymentEnabled ?? false,
+        },
+        width: '460px', maxWidth: '95vw',
+      }
+    );
+    ref.afterClosed().subscribe(result => {
+      if (result === 'saved') {
+        this.snackBar.open('Payment settings saved!', undefined, { duration: 2500 });
+        // Re-fetch trip to reflect updated paymentEnabled / costPerPerson
+        this.tripSvc.getTripDoc(trip.id).subscribe(t => this.trip.set(t));
       }
     });
   }

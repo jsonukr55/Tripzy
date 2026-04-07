@@ -1,16 +1,16 @@
-export type PaymentStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'refunded';
-export type PaymentProvider = 'razorpay' | 'stripe';
+export type PaymentStatus = 'unpaid' | 'paid';
 
-export interface Payment {
+export interface TripPayment {
   id: string;
   tripId: string;
   userId: string;
-  hostId: string;
-  amount: number;
+  userName: string;
+  userPhotoURL: string | null;
+  amountDue: number;
   currency: string;
   status: PaymentStatus;
-  provider: PaymentProvider | null;
-  providerPaymentId: string | null; // external provider reference
+  markedByHost: boolean;
+  paidAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
