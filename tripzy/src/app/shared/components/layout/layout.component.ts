@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
@@ -6,8 +6,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatRippleModule } from '@angular/material/core';
 import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { Subscription } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { AuthService } from '../../../core/services/auth.service';
+import { ChatService } from '../../../core/services/chat.service';
 
 interface NavItem {
   icon: string;
@@ -48,7 +50,12 @@ interface NavItem {
                   (click)="isMobile() && drawerOpen.set(false)"
                   matRipple
                 >
-                  <mat-icon>{{ item.icon }}</mat-icon>
+                  <div class="nav-icon-wrap">
+                    <mat-icon>{{ item.icon }}</mat-icon>
+                    @if (item.route === '/chat' && totalUnread() > 0) {
+                      <span class="nav-badge">{{ totalUnread() > 99 ? '99+' : totalUnread() }}</span>
+                    }
+                  </div>
                   <span>{{ item.label }}</span>
                 </a>
               }
@@ -232,6 +239,16 @@ interface NavItem {
       &:hover { background: #f1f5f9; }
     }
 
+    .nav-icon-wrap { position: relative; display: flex; align-items: center; justify-content: center; }
+    .nav-badge {
+      position: absolute; top: -6px; right: -8px;
+      min-width: 16px; height: 16px; border-radius: 8px;
+      background: #ff6b2b; color: #fff;
+      font-size: 10px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0 4px;
+    }
+
     /* ── Content ── */
     .content {
       flex: 1; overflow-y: auto;
@@ -243,16 +260,30 @@ interface NavItem {
     }
   `],
 })
-export class LayoutComponent {
-  auth = inject(AuthService);
-  drawerOpen = signal(false);
+export class LayoutComponent implements OnInit, OnDestroy {
+  auth        = inject(AuthService);
+  private chatService = inject(ChatService);
+  drawerOpen  = signal(false);
+  totalUnread = signal(0);
 
+  private chatSub?: Subscription;
   private breakpoints = inject(BreakpointObserver);
   isMobile = toSignal(
     this.breakpoints.observe([Breakpoints.Handset, Breakpoints.TabletPortrait])
       .pipe(map((r) => r.matches)),
     { initialValue: false }
   );
+
+  ngOnInit(): void {
+    const uid = this.auth.uid;
+    if (!uid) return;
+    this.chatSub = this.chatService.getMyChats(uid).subscribe((chats) => {
+      const total = chats.reduce((sum, c) => sum + (c.unreadCount?.[uid] ?? 0), 0);
+      this.totalUnread.set(total);
+    });
+  }
+
+  ngOnDestroy(): void { this.chatSub?.unsubscribe(); }
 
   get userName(): string {
     return this.auth.currentUser()?.displayName ?? 'Traveller';

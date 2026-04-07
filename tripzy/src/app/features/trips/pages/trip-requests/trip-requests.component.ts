@@ -1,5 +1,5 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -7,6 +7,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { RequestService } from '../../../../core/services/request.service';
 import { AuthService } from '../../../../core/services/auth.service';
 import { TripService } from '../../../../core/services/trip.service';
+import { ChatService } from '../../../../core/services/chat.service';
 import { JoinRequest, RequestStatus } from '../../../../core/models/request.model';
 import { Trip } from '../../../../core/models/trip.model';
 import { LoadingSpinnerComponent } from '../../../../shared/components/loading-spinner/loading-spinner.component';
@@ -31,6 +32,13 @@ type FilterTab = 'all' | RequestStatus;
           </div>
         </div>
 
+        @if (loadError()) {
+          <div class="error-box">
+            <mat-icon>error_outline</mat-icon>
+            <span>{{ loadError() }}</span>
+          </div>
+        }
+
         <!-- Tabs -->
         <div class="tabs">
           @for (tab of tabs; track tab.value) {
@@ -54,6 +62,7 @@ type FilterTab = 'all' | RequestStatus;
                     <div class="avatar-fallback">{{ req.requesterName[0].toUpperCase() }}</div>
                   }
                 </div>
+
                 <div class="req-body">
                   <div class="req-top">
                     <span class="req-name">{{ req.requesterName }}</span>
@@ -61,17 +70,24 @@ type FilterTab = 'all' | RequestStatus;
                   </div>
                   @if (req.message) { <p class="req-msg">{{ req.message }}</p> }
                   <span class="req-date"><mat-icon>schedule</mat-icon> {{ req.createdAt | date:'d MMM yyyy, h:mm a' }}</span>
-                </div>
-                @if (req.status === 'pending') {
-                  <div class="req-actions">
-                    <button class="approve-btn" (click)="updateStatus(req, 'approved')" [disabled]="processingId() === req.id">
-                      <mat-icon>check</mat-icon> Approve
+
+                  <!-- Action row -->
+                  <div class="req-action-row">
+                    <button class="chat-btn" (click)="openChat(req)" [disabled]="chattingId() === req.id">
+                      <mat-icon>chat_bubble_outline</mat-icon>
+                      {{ chattingId() === req.id ? 'Opening...' : 'Message' }}
                     </button>
-                    <button class="reject-btn" (click)="updateStatus(req, 'rejected')" [disabled]="processingId() === req.id">
-                      <mat-icon>close</mat-icon> Reject
-                    </button>
+
+                    @if (req.status === 'pending') {
+                      <button class="approve-btn" (click)="updateStatus(req, 'approved')" [disabled]="processingId() === req.id">
+                        <mat-icon>check</mat-icon> Approve
+                      </button>
+                      <button class="reject-btn" (click)="updateStatus(req, 'rejected')" [disabled]="processingId() === req.id">
+                        <mat-icon>close</mat-icon> Reject
+                      </button>
+                    }
                   </div>
-                }
+                </div>
               </div>
             }
           </div>
@@ -86,46 +102,55 @@ type FilterTab = 'all' | RequestStatus;
     .back-btn:hover { background:#f8fafc; }
     .page-header h1 { margin:0; font-size:22px; font-weight:800; color:#0a0f28; }
     .page-header p { margin:2px 0 0; font-size:13px; color:#64748b; }
+
+    .error-box { display:flex; align-items:center; gap:10px; padding:14px 18px; background:#fef2f2; border:1px solid #fecaca; border-radius:12px; color:#dc2626; font-size:13px; font-weight:500; mat-icon { font-size:20px; } }
+
     .tabs { display:flex; gap:8px; flex-wrap:wrap; }
     .tab-btn { display:flex; align-items:center; gap:6px; padding:8px 18px; border-radius:20px; border:1.5px solid #e2e8f0; background:#fff; font-size:13px; font-weight:600; color:#64748b; cursor:pointer; transition:all .15s; }
     .tab-btn:hover { border-color:#ff9f1c; color:#ff6b2b; }
     .tab-btn--active { border-color:#ff6b2b; background:linear-gradient(135deg,#fff4ee,#fff9f0); color:#ff6b2b; }
     .tab-count { background:#ff6b2b; color:#fff; border-radius:10px; padding:1px 7px; font-size:11px; font-weight:700; }
+
     .req-list { display:flex; flex-direction:column; gap:12px; }
     .req-card { display:flex; gap:16px; align-items:flex-start; background:#fff; border-radius:14px; border:1px solid #e2e8f0; padding:18px; box-shadow:0 1px 3px rgba(0,0,0,.04); }
     .req-avatar { width:52px; height:52px; border-radius:50%; overflow:hidden; flex-shrink:0; }
     .req-avatar img { width:100%; height:100%; object-fit:cover; }
     .avatar-fallback { width:100%; height:100%; background:linear-gradient(135deg,#ff6b2b,#ff9f1c); display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:700; color:#fff; }
+
     .req-body { flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
     .req-top { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
     .req-name { font-size:15px; font-weight:700; color:#0a0f28; }
     .status-badge { padding:3px 12px; border-radius:20px; font-size:11.5px; font-weight:700; text-transform:capitalize; }
-    .status-pending { background:#fff7ed; color:#c2410c; }
+    .status-pending  { background:#fff7ed; color:#c2410c; }
     .status-approved { background:#f0fdf4; color:#15803d; }
     .status-rejected { background:#fef2f2; color:#b91c1c; }
     .req-msg { font-size:13px; color:#475569; margin:0; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
-    .req-date { display:flex; align-items:center; gap:4px; font-size:12px; color:#94a3b8; }
-    .req-date mat-icon { font-size:14px; width:14px; height:14px; }
-    .req-actions { display:flex; flex-direction:column; gap:8px; flex-shrink:0; }
-    .approve-btn { display:flex; align-items:center; gap:6px; padding:8px 16px; background:linear-gradient(135deg,#16a34a,#22c55e); color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; }
-    .approve-btn:disabled { opacity:.5; cursor:not-allowed; }
-    .reject-btn { display:flex; align-items:center; gap:6px; padding:8px 16px; background:#fff; color:#dc2626; border:1.5px solid #fca5a5; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; }
-    .reject-btn:disabled { opacity:.5; cursor:not-allowed; }
-    @media (max-width:600px) { .req-card { flex-wrap:wrap; } .req-actions { flex-direction:row; width:100%; } }
+    .req-date { display:flex; align-items:center; gap:4px; font-size:12px; color:#94a3b8; mat-icon { font-size:14px; width:14px; height:14px; } }
+
+    .req-action-row { display:flex; gap:8px; flex-wrap:wrap; margin-top:4px; }
+    .chat-btn { display:flex; align-items:center; gap:5px; padding:6px 14px; background:#f1f5f9; border:1.5px solid #e2e8f0; border-radius:8px; font-size:12.5px; font-weight:600; color:#475569; cursor:pointer; transition:all .15s; mat-icon { font-size:16px; width:16px; height:16px; } &:hover { border-color:#ff9f1c; color:#ff6b2b; background:#fff4ee; } &:disabled { opacity:.5; cursor:not-allowed; } }
+    .approve-btn { display:flex; align-items:center; gap:5px; padding:6px 14px; background:linear-gradient(135deg,#16a34a,#22c55e); color:#fff; border:none; border-radius:8px; font-size:12.5px; font-weight:700; cursor:pointer; mat-icon { font-size:16px; width:16px; height:16px; } &:disabled { opacity:.5; cursor:not-allowed; } }
+    .reject-btn { display:flex; align-items:center; gap:5px; padding:6px 14px; background:#fff; color:#dc2626; border:1.5px solid #fca5a5; border-radius:8px; font-size:12.5px; font-weight:700; cursor:pointer; mat-icon { font-size:16px; width:16px; height:16px; } &:disabled { opacity:.5; cursor:not-allowed; } }
+
+    @media (max-width:600px) { .req-card { flex-wrap:wrap; } }
   `],
 })
 export class TripRequestsComponent implements OnInit {
   private route          = inject(ActivatedRoute);
+  private router         = inject(Router);
   private requestService = inject(RequestService);
   private tripService    = inject(TripService);
   private auth           = inject(AuthService);
+  private chatService    = inject(ChatService);
   private snackBar       = inject(MatSnackBar);
 
-  readonly loading     = signal(true);
-  readonly requests    = signal<JoinRequest[]>([]);
-  readonly trip        = signal<Trip | null>(null);
-  readonly activeTab   = signal<FilterTab>('all');
+  readonly loading      = signal(true);
+  readonly requests     = signal<JoinRequest[]>([]);
+  readonly trip         = signal<Trip | null>(null);
+  readonly activeTab    = signal<FilterTab>('all');
   readonly processingId = signal<string | null>(null);
+  readonly chattingId   = signal<string | null>(null);
+  readonly loadError    = signal<string | null>(null);
 
   tripId = '';
 
@@ -151,7 +176,33 @@ export class TripRequestsComponent implements OnInit {
     this.tripService.getTripDoc(this.tripId).subscribe((t) => this.trip.set(t));
     this.requestService.getRequestsForTrip(this.tripId).subscribe({
       next: (reqs) => { this.requests.set(reqs); this.loading.set(false); },
-      error: () => this.loading.set(false),
+      error: (err) => {
+        console.error('[TripRequests] load error:', err);
+        this.loadError.set(err?.message ?? 'Failed to load requests. Check Firestore rules.');
+        this.loading.set(false);
+      },
+    });
+  }
+
+  openChat(req: JoinRequest): void {
+    const me = this.auth.currentUser();
+    if (!me) return;
+    this.chattingId.set(req.id);
+    this.chatService.getOrCreateDirectChat(
+      me.uid,
+      me.displayName ?? 'Host',
+      req.requesterId,
+      req.requesterName,
+    ).subscribe({
+      next: (chatId) => {
+        this.chattingId.set(null);
+        this.router.navigate(['/chat', chatId]);
+      },
+      error: (err) => {
+        this.chattingId.set(null);
+        console.error('[TripRequests] chat error:', err);
+        this.snackBar.open('Could not open chat.', 'Dismiss', { duration: 3000 });
+      },
     });
   }
 

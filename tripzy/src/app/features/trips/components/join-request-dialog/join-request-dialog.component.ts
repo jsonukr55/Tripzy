@@ -91,8 +91,8 @@ export class JoinRequestDialogComponent {
         tripTitle:         trip.title,
         tripCoverImageURL: trip.coverImageURL ?? undefined,
         requesterId:       uid,
-        requesterName:     profile?.displayName ?? 'Traveller',
-        requesterPhotoURL: profile?.photoURL ?? undefined,
+        requesterName:     profile?.displayName ?? this.auth.currentUser()?.displayName ?? 'Traveller',
+        requesterPhotoURL: profile?.photoURL ?? this.auth.currentUser()?.photoURL ?? undefined,
         hostId:            trip.hostId,
         message:           this.form.value.message!,
       }).subscribe({
