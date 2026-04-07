@@ -1,7 +1,7 @@
 import { Injectable, inject, Injector, runInInjectionContext } from '@angular/core';
 import {
   Firestore, Timestamp, collection, addDoc, updateDoc, getDocs,
-  doc, query, where, orderBy, serverTimestamp,
+  doc, query, where, serverTimestamp,
 } from '@angular/fire/firestore';
 import { Observable, from } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -40,17 +40,23 @@ export class RequestService {
 
   /** Get all requests for a trip (host view) */
   getRequestsForTrip(tripId: string): Observable<JoinRequest[]> {
-    const q = query(this.col(), where('tripId', '==', tripId), orderBy('createdAt', 'desc'));
+    const q = query(this.col(), where('tripId', '==', tripId));
     return this.run(() => getDocs(q)).pipe(
-      map((snap) => snap.docs.map((d) => normalize(d.data() as Record<string, unknown>, d.id)))
+      map((snap) => snap.docs
+        .map((d) => normalize(d.data() as Record<string, unknown>, d.id))
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      )
     );
   }
 
   /** Get all requests sent by a user */
   getMyRequests(uid: string): Observable<JoinRequest[]> {
-    const q = query(this.col(), where('requesterId', '==', uid), orderBy('createdAt', 'desc'));
+    const q = query(this.col(), where('requesterId', '==', uid));
     return this.run(() => getDocs(q)).pipe(
-      map((snap) => snap.docs.map((d) => normalize(d.data() as Record<string, unknown>, d.id)))
+      map((snap) => snap.docs
+        .map((d) => normalize(d.data() as Record<string, unknown>, d.id))
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      )
     );
   }
 
