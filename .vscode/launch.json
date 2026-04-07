@@ -1,0 +1,40 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Dev: Launch App",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:4200",
+      "preLaunchTask": "Dev: Start All",
+      "presentation": { "order": 1 }
+    },
+    {
+      "name": "Debug: API Server",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/tripzy/dev-api.js",
+      "cwd": "${workspaceFolder}/tripzy",
+      "envFile": "${workspaceFolder}/tripzy/.env",
+      "console": "integratedTerminal",
+      "presentation": { "order": 2 }
+    },
+    {
+      "name": "Build: Production",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["ng", "build", "--configuration=production"],
+      "cwd": "${workspaceFolder}/tripzy",
+      "console": "integratedTerminal",
+      "presentation": { "order": 3 }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Dev: Full Stack (API + Chrome)",
+      "configurations": ["Debug: API Server", "Dev: Launch App"],
+      "presentation": { "order": 0 }
+    }
+  ]
+}

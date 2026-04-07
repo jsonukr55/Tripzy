@@ -1,0 +1,46 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    // ── Dev: Open app in Chrome (starts both servers) ─────────────────────────
+    {
+      "name": "Dev: Launch App",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:4200",
+      "preLaunchTask": "Dev: Start All",
+      "presentation": { "order": 1 }
+    },
+
+    // ── Debug: API Server (Node.js) ───────────────────────────────────────────
+    {
+      "name": "Debug: API Server",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/dev-api.js",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "restart": true,
+      "presentation": { "order": 2 }
+    },
+
+    // ── Attach: Angular in existing Chrome ────────────────────────────────────
+    {
+      "name": "Attach: Chrome (4200)",
+      "type": "chrome",
+      "request": "attach",
+      "port": 9222,
+      "url": "http://localhost:4200",
+      "presentation": { "order": 3 }
+    }
+  ],
+
+  "compounds": [
+    // ── Run & Debug both API + Angular at once ────────────────────────────────
+    {
+      "name": "Dev: Full Stack",
+      "configurations": ["Debug: API Server", "Dev: Launch App"],
+      "presentation": { "order": 0 }
+    }
+  ]
+}

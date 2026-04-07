@@ -1,0 +1,8 @@
+[
+  {
+    "origin": ["http://localhost:4200", "https://tripzy-7b9c5.web.app", "https://tripzy-7b9c5.firebaseapp.com"],
+    "method": ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"],
+    "maxAgeSeconds": 3600,
+    "responseHeader": ["Content-Type", "Authorization", "x-goog-resumable"]
+  }
+]

@@ -1,0 +1,86 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    // ── API Server ────────────────────────────────────────────────────────────
+    {
+      "label": "Start API Server",
+      "type": "shell",
+      "command": "node dev-api.js",
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": { "regexp": "." },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": { "regexp": "Local API server running" },
+          "endsPattern":   { "regexp": "XXXXNEVER" }
+        }
+      },
+      "presentation": {
+        "label": "API Server",
+        "group": "dev",
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+
+    // ── Angular Dev Server ───────────────────────────────────────────────────
+    {
+      "label": "Start Angular",
+      "type": "shell",
+      "command": "npx ng serve",
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "typescript",
+        "pattern": "$tsc",
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": { "regexp": "Building\\.\\.\\." },
+          "endsPattern":   { "regexp": "bundle generation complete" }
+        }
+      },
+      "presentation": {
+        "label": "Angular",
+        "group": "dev",
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+
+    // ── Start Both (Dev) ─────────────────────────────────────────────────────
+    {
+      "label": "Dev: Start All",
+      "dependsOrder": "parallel",
+      "dependsOn": ["Start API Server", "Start Angular"],
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "reveal": "silent" }
+    },
+
+    // ── Stop All ─────────────────────────────────────────────────────────────
+    {
+      "label": "Dev: Stop All",
+      "type": "shell",
+      "command": "echo Stopped (close the API Server and Angular terminals above)",
+      "presentation": { "reveal": "never" }
+    },
+
+    // ── Production Build ─────────────────────────────────────────────────────
+    {
+      "label": "Build: Production",
+      "type": "shell",
+      "command": "npx ng build --configuration=production",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "build",
+      "presentation": {
+        "label": "Prod Build",
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    }
+  ]
+}
