@@ -1,4 +1,5 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { Storage, ref, uploadBytesResumable, getDownloadURL } from '@angular/fire/storage';
 import { Observable } from 'rxjs';
 
 export interface UploadProgress {
@@ -8,43 +9,26 @@ export interface UploadProgress {
 
 @Injectable({ providedIn: 'root' })
 export class StorageService {
+  private storage = inject(Storage);
 
-  /**
-   * Upload a file via our server-side API.
-   * Sends raw binary bytes — no base64, no JSON body-size limits.
-   * Path is passed via the x-blob-path header.
-   */
   uploadFile(path: string, file: File): Observable<UploadProgress> {
     return new Observable((observer) => {
-      const xhr = new XMLHttpRequest();
+      const storageRef = ref(this.storage, path);
+      const uploadTask = uploadBytesResumable(storageRef, file);
 
-      xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable) {
-          const pct = Math.round((e.loaded / e.total) * 100);
-          observer.next({ progress: pct, downloadURL: null });
-        }
-      });
-
-      xhr.addEventListener('load', () => {
-        if (xhr.status === 200) {
-          const result = JSON.parse(xhr.responseText) as { url: string };
-          observer.next({ progress: 100, downloadURL: result.url });
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+          observer.next({ progress, downloadURL: null });
+        },
+        (error) => observer.error(error),
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          observer.next({ progress: 100, downloadURL });
           observer.complete();
-        } else {
-          try {
-            const err = JSON.parse(xhr.responseText) as { error: string };
-            observer.error(new Error(err.error));
-          } catch {
-            observer.error(new Error(`Upload failed (${xhr.status})`));
-          }
-        }
-      });
-
-      xhr.addEventListener('error', () => observer.error(new Error('Network error during upload')));
-
-      xhr.open('POST', `/api/blob/upload?path=${encodeURIComponent(path)}`);
-      xhr.setRequestHeader('Content-Type', file.type);
-      xhr.send(file);
+        },
+      );
     });
   }
 
