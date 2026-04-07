@@ -57,9 +57,11 @@ interface NavItem {
             <div class="sidebar-footer">
               <a class="nav-item" routerLink="/profile" routerLinkActive="nav-item--active" matRipple
                 (click)="isMobile() && drawerOpen.set(false)">
-                <div class="avatar">
-                  {{ initial }}
-                </div>
+                @if (auth.currentUser()?.photoURL) {
+                  <img class="avatar" [src]="auth.currentUser()!.photoURL!" alt="avatar" />
+                } @else {
+                  <div class="avatar">{{ initial }}</div>
+                }
                 <div class="user-info">
                   <span class="user-name">{{ userName }}</span>
                   <span class="user-sub">View profile</span>

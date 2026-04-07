@@ -72,13 +72,17 @@ export class AuthService {
       runInInjectionContext(this.injector, () =>
         signInWithPopup(this.auth, provider)
       ).then(async (cred) => {
-        // Only create profile on first Google sign-in
         const exists = await this.userService.doesProfileExist(cred.user.uid).toPromise();
         if (!exists) {
           await this.userService.createProfile(cred.user.uid, {
             uid: cred.user.uid,
             email: cred.user.email!,
             displayName: cred.user.displayName ?? 'Traveller',
+            photoURL: cred.user.photoURL,
+          }).toPromise();
+        } else if (cred.user.photoURL) {
+          // Sync latest Google photo on every sign-in
+          await this.userService.updateProfile(cred.user.uid, {
             photoURL: cred.user.photoURL,
           }).toPromise();
         }
